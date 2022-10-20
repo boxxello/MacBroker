@@ -28,10 +28,10 @@ pip install git@github.com:boxxello/MacGenerator-Validator.git
 ```python
 from macbroker.Generator import MacBroker, Format
 
-mac_generator=MacBroker()
+
 print(MacBroker().lookup("60:8B:0E:00:00"))
-print(mac_generator.generate_n_mac_addresses(format_type=Format.CISCO, quantity=3, lowercase=False))
-print(mac_generator.generate_n_mac_addresses(format_type=Format.COLON, quantity=3, lowercase=True))
+print(MacBroker().generate_n_mac_addresses(format_type=Format.CISCO, quantity=3, lowercase=False))
+print(MacBroker().generate_n_mac_addresses(format_type=Format.COLON, quantity=3, lowercase=True))
 ```
 Output:
 
@@ -74,16 +74,17 @@ MacBroker().update_vendors()
 or you can also check the latest update date and update it if needed with the following:
 ```python
 from macbroker.Exceptions import NoDateFoundCacheError
-from macbroker.Generator import MacBroke
+from macbroker.Generator import MacBroker
 
+mac_broker = MacBroker()
 try:
-    days=mac_generator.get_last_updated_cache_in_days()
+    days=mac_broker.get_last_updated_cache_in_days()
 except NoDateFoundCacheError:
     pass
 else:
     if days > 30:
         print("Updating cache")
-        mac_generator.update_vendors()
+        mac_broker.update_vendors()
 ```
 
 There is also an asynchronous interface, so you can also use:
