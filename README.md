@@ -55,7 +55,8 @@ None          | MMMMMMSSSSSS
 
 
 
-## Update the vendor list
+# Update the vendor list
+
 This module caches a list of 
 - Vendors
 - Prefixes
@@ -65,8 +66,8 @@ related to MAC addresses directly from the IEEE at run-time.
 If ever needed to update information you can download a fresh the following code.
 
 ```python
-
 from mac_generator_validator.Generator import MacBroker
+
 MacBroker().update_vendors()
 ```
 
@@ -74,6 +75,7 @@ or you can also check the latest update date and update it if needed with the fo
 ```python
 from mac_generator_validator.Exceptions import NoDateFoundCacheError
 from mac_generator_validator.Generator import MacBroke
+
 try:
     days=mac_generator.get_last_updated_cache_in_days()
 except NoDateFoundCacheError:
@@ -83,10 +85,12 @@ else:
         print("Updating cache")
         mac_generator.update_vendors()
 ```
-There is also an asynchronous interface you can use:
+
+There is also an asynchronous interface, so you can also use:
 ```python
 import asyncio
 from mac_generator_validator.Generator import  Format, AsyncMacBroker
+
 async def main():
     mac_generator=AsyncMacBroker()
     print(await mac_generator.generate_n_mac_addresses(format_type=Format.CISCO, quantity=3, lowercase=False))
@@ -107,7 +111,52 @@ Output:
 >  Apple, Inc.
 
 >  SZ
-
+ 
 # Command line interface
---------------
 
+The command line interface could be improved but right now it provides support for: 
+- validating mac addresses from an input list with --input or -i and --validate or -v
+- outputting the validated mac addresses to an output file with --output or -o
+- generating mac addresses with --generate or -g and specifying the quantity with --quantity or -q
+- generating mac addresses with a specific format with --format or -f
+- activating the debug logger with --debug or -d
+
+
+The cli can be used as follows:
+```bash
+$ mac_generator_validator args
+```
+or
+```bash
+$ python -m mac_generator_validator args
+```
+
+The arguments are described above and the help can be accessed with:
+```bash
+[-h,--help] [-i,--input INPUT]
+[-o,--output OUTPUT] [-v,--validate]
+[-g,--generate] [-q,--quantity QUANTITY]
+[-f,--format {cisco,colon,hyphen,period,none}] [-d,--debug]
+[-o, --output OUTPUT]
+```
+
+More to come in the future.
+
+License
+-------------
+
+Licensed under the Apache License, Version 2.0
+
+
+Thanks goes to these existing libraries
+-------------
+-   This product include portions of code from [mac_vendor_lookup](https://github.com/bauerj/mac_vendor_lookup)
+
+Contributing
+-------------
+
+-   Fork it: <https://github.com/boxxello/MacGenerator-Validator/fork>
+-   Create your feature branch: `git checkout -b MY-NEW-FEATURE`
+-   Commit your changes: `git commit -am 'Add some feature'`
+-   Push to the branch: `git push origin MY-NEW-FEATURE`
+-   Submit a pull request, they are always appreciated!
