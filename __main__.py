@@ -1,14 +1,13 @@
 import argparse
-import logging
 from argparse import Namespace
 
-from mac_generator_validator.Generator import get_format, generate_mac_address, is_mac_addr_valid, load_macs_from_file, \
-    validate_mac_addr_list, Format
+from mac_generator_validator.Generator import Format, MacLookup, load_macs_from_file
 from mac_generator_validator.loggers import get_logger, enable_debug_logging
 
 logger = get_logger(__name__)
 
-def parse_args()->Namespace:
+
+def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description='Mac Generator & Validator')
     parser.add_argument(
         "--input",
@@ -61,7 +60,9 @@ def parse_args()->Namespace:
     logger.info(args)
 
     return args
-def parse_type_argument(str)->Format:
+
+
+def parse_type_argument(str) -> Format:
     """
     Parse the type argument from the command line
 
@@ -84,8 +85,8 @@ def parse_type_argument(str)->Format:
 
 
 if __name__ == '__main__':
-    macs=[]
-
+    macs = []
+    mac_generator = MacLookup()
     args = parse_args()
     if args.debug:
         enable_debug_logging()
@@ -98,29 +99,26 @@ if __name__ == '__main__':
         if args.quantity:
             logger.info(f"Generating {args.quantity} MAC addresses")
         else:
-            logger.info(f"Defaulting to generating 1 MAC address since --macs was not specified")
-            args.quantity=1
+            logger.warning(f"Defaulting to generating 1 MAC address since --macs was not specified")
+            args.quantity = 1
     if args.type:
         logger.info(f"Generating {args.type} MAC addresses")
-    format_type=parse_type_argument(args.type)
+    format_type = parse_type_argument(args.type)
     logger.debug(f"Format type is {format_type}")
     if args.generate:
-        macs.extend(list(generate_mac_address(format_type=format_type, quantity=args.quantity, lowercase=False)))
+        macs.extend(list(
+            mac_generator.generate_n_mac_addresses(format_type=format_type, quantity=args.quantity, lowercase=False)))
+
     if args.validate:
         valid_macs = []
         if args.input:
             logger.info(f"Validating MAC addresses in file {args.input} ")
             macs.extend(load_macs_from_file(args.input))
-            valid_macs=validate_mac_addr_list(macs)
+            valid_macs = [x[1] for x in mac_generator.is_mac_addr_list_valid(macs) if x[0] ]
         elif args.generate:
             logger.info(f"Verifying MAC addresses generated")
-            valid_macs=(validate_mac_addr_list(macs))
+            valid_macs = [x[1] for x in mac_generator.is_mac_addr_list_valid(macs) if x[0] ]
         else:
             logger.info(f"Couldn't retrieve input file, please specify one with --input")
             exit(-1)
         logger.info(valid_macs)
-
-
-
-
-
