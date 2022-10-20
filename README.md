@@ -20,7 +20,7 @@ A simple module to generate valid mac addresses and to validate inputted ones
 --------------
 
 ```
-pip install git@github.com:boxxello/MacGenerator-Validator.git
+pip install git+https://github.com/boxxello/MacBroker.git
 ```
 
 ## MacBroker Hello World
