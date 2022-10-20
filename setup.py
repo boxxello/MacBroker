@@ -12,7 +12,9 @@ with open('mac_generator_validator/__init__.py', 'rb') as f:
         f.read().decode('utf-8')).group(1)))
 
 requirements = [
-
+    'aiofiles==22.1.0',
+    'aiohttp==3.8.3',
+    'requests==2.28.1',
 
 ]
 
