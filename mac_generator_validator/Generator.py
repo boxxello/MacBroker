@@ -11,6 +11,7 @@ import sys
 import aiofiles
 import aiohttp
 
+from mac_generator_validator.Utils_methods import is_path_exists_or_creatable
 from mac_generator_validator.loggers import get_logger, enable_debug_logging
 
 from mac_generator_validator.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError
@@ -47,6 +48,15 @@ def load_macs_from_file(filename: str) -> List[str]:
         raise FileNotFoundError("File not found")
     with open(filename, "r") as file:
         return file.read().splitlines()
+
+def save_macs_to_file(filename: str, macs: List[str]) -> None:
+    """save macs to file
+    :param filename: the filename to save to
+    :param macs: the list of macs
+    """
+    if is_path_exists_or_creatable(filename):
+        with open(filename, "w") as file:
+            file.write("\n".join(macs))
 
 def set_lettercase(string: str, lowercase: bool) -> str:
     """determines lettercase for MAC address

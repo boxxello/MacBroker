@@ -1,7 +1,7 @@
 import argparse
 from argparse import Namespace
 
-from mac_generator_validator.Generator import Format, MacLookup, load_macs_from_file
+from mac_generator_validator.Generator import Format, MacLookup, load_macs_from_file, save_macs_to_file
 from mac_generator_validator.loggers import get_logger, enable_debug_logging
 
 logger = get_logger(__name__)
@@ -121,4 +121,7 @@ if __name__ == '__main__':
         else:
             logger.info(f"Couldn't retrieve input file, please specify one with --input")
             exit(-1)
-        logger.info(valid_macs)
+        logger.info(f"Valid MAC addresses: {valid_macs}")
+    if args.output:
+        save_macs_to_file(args.output, macs)
+
