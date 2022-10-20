@@ -92,9 +92,9 @@ def main():
         enable_debug_logging()
     if args.output:
         logger.info(f"Output file is {args.output}")
-    else:
-        logger.info(f"Couldn't retrieve output file, please specify one with --output")
-        exit(-2)
+    if args.validate and not args.input:
+        logger.info(f"Couldn't retrieve input file, please specify one with --input or -i when validating")
+        exit(-1)
     if args.generate:
         if args.quantity:
             logger.info(f"Generating {args.quantity} MAC addresses")
@@ -105,10 +105,11 @@ def main():
         logger.info(f"Generating {args.type} MAC addresses")
     format_type = parse_type_argument(args.type)
     logger.debug(f"Format type is {format_type}")
-    if args.generate:
+    if args.generate and not args.validate:
         macs.extend(list(
             mac_generator.generate_n_mac_addresses(format_type=format_type, quantity=args.quantity, lowercase=False)))
-
+        logger.info(f"Generated {len(macs)} MAC addresses")
+        logger.info("Generated MAC addresses:\n" + "\n".join(macs))
     if args.validate:
         valid_macs = []
         if args.input:
@@ -118,12 +119,8 @@ def main():
         elif args.generate:
             logger.info(f"Verifying MAC addresses generated")
             valid_macs = [x[1] for x in mac_generator.is_mac_addr_list_valid(macs) if x[0] ]
-        else:
-            logger.info(f"Couldn't retrieve input file, please specify one with --input")
-            exit(-1)
         logger.info(f"Valid MAC addresses: {valid_macs}")
-    if args.output:
-        save_macs_to_file(args.output, macs)
+    save_macs_to_file(args.output, macs)
 if __name__ == '__main__':
     main()
 
