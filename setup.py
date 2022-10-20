@@ -30,7 +30,7 @@ setup(
     package_dir={},
     entry_points={
         'console_scripts': [
-            'mac_generator_validator=mac_generator_validator:__main__:main'
+            'mac_generator_validator=mac_generator_validator:main'
         ]
     },
     include_package_data=True,
