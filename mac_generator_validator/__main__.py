@@ -84,7 +84,7 @@ def parse_type_argument(str) -> Format:
         return Format.NONE
 
 
-if __name__ == '__main__':
+def main():
     macs = []
     mac_generator = MacBroker()
     args = parse_args()
@@ -124,4 +124,6 @@ if __name__ == '__main__':
         logger.info(f"Valid MAC addresses: {valid_macs}")
     if args.output:
         save_macs_to_file(args.output, macs)
+if __name__ == '__main__':
+    main()
 
