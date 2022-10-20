@@ -1,8 +1,8 @@
 import argparse
 from argparse import Namespace
 
-from mac_generator_validator.Generator import Format, load_macs_from_file, save_macs_to_file, MacBroker
-from mac_generator_validator.loggers import get_logger, enable_debug_logging
+from macbroker.Generator import Format, load_macs_from_file, save_macs_to_file, MacBroker
+from macbroker.loggers import get_logger, enable_debug_logging
 
 logger = get_logger(__name__)
 

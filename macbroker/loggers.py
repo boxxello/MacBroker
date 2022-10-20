@@ -3,9 +3,9 @@ import logging
 import os
 from pathlib import Path
 
-import mac_generator_validator
+import macbroker
 
-BASE_PATH = Path(os.path.abspath(mac_generator_validator.__file__)).parent
+BASE_PATH = Path(os.path.abspath(macbroker.__file__)).parent
 
 
 

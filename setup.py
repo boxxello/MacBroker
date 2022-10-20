@@ -7,7 +7,7 @@ with open('README.md') as readme_file:
 
 _version_re = re.compile(r'__version__\s+=\s+(.*)')
 
-with open('mac_generator_validator/__init__.py', 'rb') as f:
+with open('macbroker/__init__.py', 'rb') as f:
     version = str(ast.literal_eval(_version_re.search(
         f.read().decode('utf-8')).group(1)))
 
@@ -19,7 +19,7 @@ requirements = [
 ]
 
 setup(
-    name='MacGenerator-Validator',
+    name='MacBroker',
     version=version,
     description="A simple but effective mac address generator and validator ",
     long_description=readme,
@@ -30,7 +30,7 @@ setup(
     package_dir={},
     entry_points={
         'console_scripts': [
-            'mac_generator_validator=mac_generator_validator.__main__:main'
+            'macbroker=macbroker.__main__:main'
         ]
     },
     include_package_data=True,

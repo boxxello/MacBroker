@@ -11,10 +11,10 @@ import sys
 import aiofiles
 import aiohttp
 
-from mac_generator_validator.Utils_methods import is_path_exists_or_creatable
-from mac_generator_validator.loggers import get_logger, enable_debug_logging
+from macbroker.Utils_methods import is_path_exists_or_creatable
+from macbroker.loggers import get_logger, enable_debug_logging
 
-from mac_generator_validator.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError, \
+from macbroker.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError, \
     NoDateFoundCacheError
 
 logger = get_logger(__name__)
