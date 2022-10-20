@@ -219,9 +219,9 @@ class AsyncMacLookup(BaseMacLookup):
             except ValueError:
                 logger.error("quantity must be an integer, defaulting to 1")
                 quantity = 1
-        for _ in range(quantity):
-            yield await self.generate_mac_address(format_type, lowercase,  generate_partial)
-        logger.info("DONE")
+
+        return [ await self.generate_mac_address(format_type, lowercase,  generate_partial) for _ in range(quantity)]
+
 
     async def generate_mac_address(self, format_type: Format,
                          lowercase: bool,
@@ -377,8 +377,8 @@ class MacLookup(BaseMacLookup):
 
     def generate_n_mac_addresses(self,  format_type:Format= Format.COLON,
                                  lowercase: bool = False, generate_partial: bool = False, quantity:int=1) -> List[str]:
-        return self.loop.run_until_complete(list(self.async_lookup.generate_n_mac_address( format_type,
-                                                                                     lowercase, generate_partial, quantity)))
+        return self.loop.run_until_complete(self.async_lookup.generate_n_mac_address( format_type,
+                                                                                     lowercase, generate_partial, quantity))
 
 
 
@@ -388,4 +388,4 @@ if __name__ == "__main__":
     print(MacLookup().lookup("00:00:00:00:00:00"))
     print(MacLookup().build_random_nic())
     print(MacLookup().build_random_twelve_digit())
-    print(MacLookup().generate_n_mac_addresses())
+    print(MacLookup().generate_n_mac_addresses(quantity=10))
