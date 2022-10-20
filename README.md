@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# MacGenerator-Validator
+# MacBroker
 
 
 A simple module to generate valid mac addresses and to validate inputted ones
@@ -26,7 +26,7 @@ pip install git@github.com:boxxello/MacGenerator-Validator.git
 ## MacBroker Hello World
 
 ```python
-from mac_generator_validator.Generator import MacBroker, Format
+from macbroker.Generator import MacBroker, Format
 
 mac_generator=MacBroker()
 print(MacBroker().lookup("60:8B:0E:00:00"))
@@ -66,15 +66,15 @@ related to MAC addresses directly from the IEEE at run-time.
 If ever needed to update information you can download a fresh the following code.
 
 ```python
-from mac_generator_validator.Generator import MacBroker
+from macbroker.Generator import MacBroker
 
 MacBroker().update_vendors()
 ```
 
 or you can also check the latest update date and update it if needed with the following:
 ```python
-from mac_generator_validator.Exceptions import NoDateFoundCacheError
-from mac_generator_validator.Generator import MacBroke
+from macbroker.Exceptions import NoDateFoundCacheError
+from macbroker.Generator import MacBroke
 
 try:
     days=mac_generator.get_last_updated_cache_in_days()
@@ -89,7 +89,7 @@ else:
 There is also an asynchronous interface, so you can also use:
 ```python
 import asyncio
-from mac_generator_validator.Generator import  Format, AsyncMacBroker
+from macbroker.Generator import  Format, AsyncMacBroker
 
 async def main():
     mac_generator=AsyncMacBroker()
@@ -124,11 +124,11 @@ The command line interface could be improved but right now it provides support f
 
 The cli can be used as follows:
 ```bash
-$ mac_generator_validator args
+$ macbroker args
 ```
 or
 ```bash
-$ python -m mac_generator_validator args
+$ python -m macbroker args
 ```
 
 The arguments are described above and the help can be accessed with:
