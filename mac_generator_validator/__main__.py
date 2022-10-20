@@ -1,7 +1,7 @@
 import argparse
 from argparse import Namespace
 
-from mac_generator_validator.Generator import Format, MacLookup, load_macs_from_file, save_macs_to_file
+from mac_generator_validator.Generator import Format, load_macs_from_file, save_macs_to_file, MacBroker
 from mac_generator_validator.loggers import get_logger, enable_debug_logging
 
 logger = get_logger(__name__)
@@ -86,7 +86,7 @@ def parse_type_argument(str) -> Format:
 
 if __name__ == '__main__':
     macs = []
-    mac_generator = MacLookup()
+    mac_generator = MacBroker()
     args = parse_args()
     if args.debug:
         enable_debug_logging()

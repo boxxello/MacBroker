@@ -182,7 +182,7 @@ def sanitise(input_mac:str)-> str:
 OUI_URL = "http://standards-oui.ieee.org/oui.txt"
 
 
-class BaseMacLookup(object):
+class BaseMacBroker(object):
     cache_path = os.path.expanduser('~/.cache/mac-vendors.json')
     def get_last_updated(self)-> datetime:
         """
@@ -199,7 +199,7 @@ class BaseMacLookup(object):
         :return: the path to the vendors list
         """
         possible_locations = [
-            BaseMacLookup.cache_path,
+            BaseMacBroker.cache_path,
             sys.prefix + "/cache/mac-vendors.json",
             os.path.dirname(__file__) + "/../../cache/mac-vendors.json",
             os.path.dirname(__file__) + "/../../../cache/mac-vendors.json",
@@ -210,7 +210,7 @@ class BaseMacLookup(object):
                 return location
 
 
-class AsyncMacLookup(BaseMacLookup):
+class AsyncMacBroker(BaseMacBroker):
     def __init__(self):
         self.prefixes = None
 
@@ -235,7 +235,7 @@ class AsyncMacLookup(BaseMacLookup):
                         if self.prefixes:
                             self.prefixes[-1]["nationality"] = group.group(0).decode().strip()
 
-        async with aiofiles.open(AsyncMacLookup.cache_path, mode='w') as f:
+        async with aiofiles.open(AsyncMacBroker.cache_path, mode='w') as f:
             await f.write(json.dumps(self.prefixes, indent=4))
 
     async def generate_n_mac_address(self,
@@ -360,7 +360,7 @@ class AsyncMacLookup(BaseMacLookup):
 
         else:
             try:
-                os.makedirs("/".join(AsyncMacLookup.cache_path.split("/")[:-1]))
+                os.makedirs("/".join(AsyncMacBroker.cache_path.split("/")[:-1]))
             except OSError:
                 pass
             await self.update_vendors()
@@ -426,12 +426,12 @@ class AsyncMacLookup(BaseMacLookup):
         return [(True, mac) if await self.is_mac_addr_valid(mac) else (False, mac) for mac in macs]
 
 
-class MacLookup(BaseMacLookup):
+class MacBroker(BaseMacBroker):
     """
-    MacLookup class
+    MacBroker class
     """
     def __init__(self):
-        self.async_lookup = AsyncMacLookup()
+        self.async_lookup = AsyncMacBroker()
         try:
             self.loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -544,13 +544,13 @@ class MacLookup(BaseMacLookup):
 if __name__ == "__main__":
     enable_debug_logging()
     loop = asyncio.get_event_loop()
-    logger.info(MacLookup().lookup("00:00:00:00:00:00"))
-    logger.info(MacLookup().build_random_nic())
-    logger.info(MacLookup().build_random_twelve_digit())
-    logger.info(MacLookup().generate_n_mac_addresses(quantity=10))
-    logger.info(MacLookup().get_all_vendors())
-    logger.info(MacLookup().get_all_prefixes())
-    logger.info(MacLookup().get_random_vendor())
-    logger.info(MacLookup().get_random_mac_prefix())
-    logger.info(MacLookup().is_mac_addr_valid("00:00:00:00:00:00"))
-    logger.info(MacLookup().is_mac_addr_list_valid(["00:00:00:00:00:00", "00:00:00:00:00:00"]))
+    logger.info(MacBroker().lookup("00:00:00:00:00:00"))
+    logger.info(MacBroker().build_random_nic())
+    logger.info(MacBroker().build_random_twelve_digit())
+    logger.info(MacBroker().generate_n_mac_addresses(quantity=10))
+    logger.info(MacBroker().get_all_vendors())
+    logger.info(MacBroker().get_all_prefixes())
+    logger.info(MacBroker().get_random_vendor())
+    logger.info(MacBroker().get_random_mac_prefix())
+    logger.info(MacBroker().is_mac_addr_valid("00:00:00:00:00:00"))
+    logger.info(MacBroker().is_mac_addr_list_valid(["00:00:00:00:00:00", "00:00:00:00:00:00"]))
