@@ -14,7 +14,8 @@ import aiohttp
 from mac_generator_validator.Utils_methods import is_path_exists_or_creatable
 from mac_generator_validator.loggers import get_logger, enable_debug_logging
 
-from mac_generator_validator.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError
+from mac_generator_validator.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError, \
+    NoDateFoundCacheError
 
 logger = get_logger(__name__)
 
@@ -192,6 +193,22 @@ class BaseMacBroker(object):
         vendors_location = self.find_vendors_list()
         if vendors_location:
             return datetime.fromtimestamp(os.path.getmtime(vendors_location))
+    def get_last_updated_cache_in_days(self)-> int:
+        """
+        get the last updated date of the cache
+        :return: the last timestamp of the cached file
+        :raise NoDateFoundCacheError if no file modified date is found
+        """
+
+        present= datetime.now()
+        vendors_location = self.find_vendors_list()
+        cached_date=None
+        if vendors_location:
+            cached_date=datetime.fromtimestamp(os.path.getmtime(vendors_location))
+        if not cached_date:
+            raise NoDateFoundCacheError("No date found in cache")
+        delta= present - cached_date
+        return delta.days
 
     def find_vendors_list(self)-> str:
         """
@@ -238,7 +255,7 @@ class AsyncMacBroker(BaseMacBroker):
         async with aiofiles.open(AsyncMacBroker.cache_path, mode='w') as f:
             await f.write(json.dumps(self.prefixes, indent=4))
 
-    async def generate_n_mac_address(self,
+    async def generate_n_mac_addresses(self,
                              format_type: Format = None, lowercase=False,
                              generate_partial=False, quantity=1) :
         """
@@ -536,7 +553,7 @@ class MacBroker(BaseMacBroker):
         :param quantity: quantity of mac addresses to generate
         :return: List of valid mac addresses
         """
-        return self.loop.run_until_complete(self.async_lookup.generate_n_mac_address( format_type,
+        return self.loop.run_until_complete(self.async_lookup.generate_n_mac_addresses( format_type,
                                                                                      lowercase, generate_partial, quantity))
 
 
