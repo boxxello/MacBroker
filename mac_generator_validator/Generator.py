@@ -257,9 +257,9 @@ class BaseMacLookup(object):
         try:
             int(mac, 16)
         except ValueError:
-            raise InvalidMacError("{} contains unexpected character".format(_mac))
+            raise InvalidMacError(f"{_mac} contains unexpected character")
         if len(mac) > 12:
-            raise InvalidMacError("{} is not a valid MAC address (too long)".format(_mac))
+            raise InvalidMacError(f"{_mac} is not a valid MAC address (too long)")
         return mac
 
     def get_last_updated(self):
@@ -350,12 +350,11 @@ class AsyncMacLookup(BaseMacLookup):
         if not self.prefixes:
             await self.load_vendors()
         try:
-            return True if next(i for i in self.prefixes if mac.startswith(i["mac"]))["mac"] else False
+            return True if next(i for i in self.prefixes if mac.startswith(i["mac"])) else False
         except KeyError:
-            return False
-        except Exception as e:
-            logger.error(e)
-            return False
+            raise VendorNotFoundError(mac)
+
+
 
 class MacLookup(BaseMacLookup):
     def __init__(self):
@@ -380,30 +379,14 @@ class MacLookup(BaseMacLookup):
     def is_mac_addr_valid(self, mac):
         return self.loop.run_until_complete(self.async_lookup.is_mac_addr_valid(mac))
 
-def main():
-    import sys
-
-    loop = asyncio.get_event_loop()
-    if len(sys.argv) < 2:
-        print("Usage: {} [MAC-Address]".format(sys.argv[0]))
-        sys.exit()
-    try:
-        print(loop.run_until_complete(AsyncMacLookup().lookup(sys.argv[1])))
-    except KeyError:
-        print("Prefix is not registered")
-    except InvalidMacError as e:
-        print("Invalid MAC address:", e)
-
-
-
 if __name__ == "__main__":
     enable_debug_logging()
     import sys
 
     loop = asyncio.get_event_loop()
-    print(MacLookup().is_mac_addr_valid('20:00:00:00:00:00'))
-    #200000000000
-    #
-    # print(MacLookup().look_up_nationality("00:80:41:12:FE"))
+    print(MacLookup().is_mac_addr_valid("00:80:41:12:FE:00")) #-> this doesn't
+    print(MacLookup().is_mac_addr_valid("20:00:00:00:00:00")) #-> this gives trouble
+    print(MacLookup().look_up_nationality("00:80:41:12:FE:00")) #-> this doesn't
+    print(MacLookup().look_up_nationality("20:00:00:00:00:00")) #-> this gives trouble
     # print(loop.run_until_complete(AsyncMacLookup().lookup("00:00:00:00:00:00")))
 
