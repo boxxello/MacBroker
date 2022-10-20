@@ -1,15 +1,22 @@
+import asyncio
+import re
 import json
-import logging
 import os.path
 import random
 import typing
+from datetime import datetime
 from enum import Enum
-from typing import List
+from typing import List, Tuple
+
+import aiofiles
+import aiohttp
+
+from mac_generator_validator.loggers import get_logger, enable_debug_logging
 import requests
 
-from mac_generator_validator.Exceptions import FormatErrorUnknown
+from mac_generator_validator.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 """
 Supported MAC address formats:
@@ -32,26 +39,19 @@ class Format(Enum):
 
 HEXADECIMAL = "0123456789ABCDEF"
 VALIDATOR_URL = "http://macvendors.co/api/"
-HEADERS_VALIDATOR_MAC = {'User-Agent': 'API Browser',
+HEADERS_VALIDATOR_MAC = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36',
                          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                          'accept-encoding': 'gzip, deflate',
                          'accept-language': 'en-US,en;q=0.8',
-                         "referer": f"https://google.com/"}
+                         'referer': f'https://google.com/'}
 
 
-def generate_mac_address(mac_type=None, trimmed=False,
+def generate_mac_address(trimmed=False,
                          format_type: Format = None, lowercase=False,
                          generate_partial=False, quantity=1) -> List[str]:
-    if not mac_type and not format_type:
+    if not format_type:
         logger.error("No MAC address type or format type specified, defaulting to colon format")
         format_type = Format.COLON
-    elif mac_type and not format_type:
-        format_type = get_format(mac_type)
-    elif not mac_type and format_type:
-        format_type = get_mac_format(mac_type)
-    else:
-        raise ValueError("Format type and MAC address type specified, cannot chose both")
-
     try:
         lowercase = bool(lowercase)
     except ValueError:
@@ -65,6 +65,7 @@ def generate_mac_address(mac_type=None, trimmed=False,
             quantity = 1
     for _ in range(quantity):
         yield generate_address(format_type, lowercase, trimmed, generate_partial)
+    logger.info("DONE")
 
 
 def generate_address(format_type: Format,
@@ -86,13 +87,13 @@ def generate_address(format_type: Format,
         set_lettercase(not_formatted, lowercase=lowercase), format_type
     )
     if trimmed_flag:
-        mac = _trim_separator(mac)
-    if len(mac) <= 12 and not generate_partial:
+        mac = trim_separator(mac)
+    if len(mac) < 12 and not generate_partial:
         raise ValueError(f"MAC must be 12 digits but found {len(mac)}")
     return mac
 
 
-def _trim_separator(mac: str) -> str:
+def trim_separator(mac: str) -> str:
     """removes separator from MAC address
     :param mac: the mac address
     :return: the mac address without separator
@@ -191,7 +192,7 @@ def build_random_nic() -> str:
     random_nic = get_random_json_from_array().get('mac')
     # for c in range(0, 6):
     #     random_nic += random.choice(HEXADECIMAL)
-    random_nic = _trim_separator(random_nic)
+    random_nic = trim_separator(random_nic)
 
     return random_nic
 
@@ -217,7 +218,7 @@ def get_random_json_from_array() -> json:
 
 def get_vendors() -> json:
     """get the list of vendors
-            :return: the list of vendors
+            :return: the list of vendorsis_mac_addr_valid
     """
     root_dir = os.path.dirname(os.path.abspath(__file__))
     return json.load(open(os.path.join(root_dir, "vendors_mac.json"), "r"))
@@ -239,110 +240,170 @@ def get_format(mac_type) -> Format:
     elif mac_type.find("") != -1:
         return Format.NONE
     else:
-        return Format.UNKNOWN
+        raise FormatErrorUnknown("Unknown MAC format")
 
 
-def get_mac_info(mac_addr: str):
-    """get the mac address info
-    :param mac_addr: the mac address
-    :return: the validation of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return None
+OUI_URL = "http://standards-oui.ieee.org/oui.txt"
 
 
-def get_mac_vendor(mac_addr: str) -> typing.Optional[str]:
-    """get the vendor of the mac address
-    :param mac_addr: the mac address
-    :return: the vendor of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        return response.json().get('result').get('company')
 
 
-def get_mac_prefix(mac_addr: str) -> typing.Optional[str]:
-    """get the type of the mac address
-    :param mac_addr: the mac address
-    :return: the type of the mac address
-    """
-    request = requests.get(VALIDATOR_URL + mac_addr,
-                           headers=HEADERS_VALIDATOR_MAC)
-    if request.status_code == 200:
-        return request.json().get('result').get('mac_prefix')
+class BaseMacLookup(object):
+    cache_path = os.path.expanduser('~/.cache/mac-vendors.json')
+
+    @staticmethod
+    def sanitise(_mac):
+        mac = _mac.replace(":", "").replace("-", "").replace(".", "").upper()
+        try:
+            int(mac, 16)
+        except ValueError:
+            raise InvalidMacError("{} contains unexpected character".format(_mac))
+        if len(mac) > 12:
+            raise InvalidMacError("{} is not a valid MAC address (too long)".format(_mac))
+        return mac
+
+    def get_last_updated(self):
+        vendors_location = self.find_vendors_list()
+        if vendors_location:
+            return datetime.fromtimestamp(os.path.getmtime(vendors_location))
+
+    def find_vendors_list(self):
+        possible_locations = [
+            BaseMacLookup.cache_path,
+            sys.prefix + "/cache/mac-vendors.json",
+            os.path.dirname(__file__) + "/../../cache/mac-vendors.json",
+            os.path.dirname(__file__) + "/../../../cache/mac-vendors.json",
+        ]
+
+        for location in possible_locations:
+            if os.path.exists(location):
+                return location
 
 
-def is_mac_addr_valid(mac_addr: str) -> bool:
-    """validate the mac address
-    :param mac_addr: the mac address
-    :return: the validation of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        if response.json().get('result').get('company'):
-            return True
-        elif response.json().get('result').get('error'):
-            return False
-        # you can add more conditions here based on how do you want
-        # to handle the response from the API on error
+class AsyncMacLookup(BaseMacLookup):
+    def __init__(self):
+        self.prefixes = None
+
+    async def update_vendors(self, url=OUI_URL):
+        logger.debug( "Downloading MAC vendor list")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                self.prefixes = []
+                while True:
+                    line = await response.content.readline()
+
+                    if not line:
+                        break
+                    if b"(base 16)" in line:
+                        prefix, vendor = (i.strip() for i in line.split(b"(base 16)", 1))
+                        self.prefixes.append({"vendor": vendor.decode(), "mac": prefix.decode()})
+                    elif group:=re.search(b"[A-Z]{2}", line):
+                        if self.prefixes:
+                            self.prefixes[-1]["nationality"] = group.group(0).decode().strip()
+
+        async with aiofiles.open(AsyncMacLookup.cache_path, mode='w') as f:
+            await f.write(json.dumps(self.prefixes, indent=4))
+
+
+
+    async def load_vendors(self):
+        self.prefixes = []
+
+        vendors_location = self.find_vendors_list()
+        if vendors_location:
+            logger.debug("Loading vendor list from {}".format(vendors_location))
+            async with aiofiles.open(vendors_location, mode='r') as f:
+                self.prefixes = json.loads(await f.read())
+
         else:
+            try:
+                os.makedirs("/".join(AsyncMacLookup.cache_path.split("/")[:-1]))
+            except OSError:
+                pass
+            await self.update_vendors()
+        logger.debug( "Vendor list successfully loaded: {} entries".format(len(self.prefixes)))
+
+    async def lookup(self, mac):
+        mac = self.sanitise(mac)
+        if not self.prefixes:
+            await self.load_vendors()
+        try:
+            return next(i for i in self.prefixes if mac.startswith(i["mac"]))["vendor"]
+        except KeyError:
+            raise VendorNotFoundError(mac)
+
+    async def look_up_nationality(self, mac):
+        mac = self.sanitise(mac)
+        if not self.prefixes:
+            await self.load_vendors()
+        try:
+            return next(i for i in self.prefixes if mac.startswith(i["mac"]))["nationality"]
+        except KeyError:
+            raise VendorNotFoundError(mac)
+    async def is_mac_addr_valid(self, mac):
+        """
+        Check if the mac address is valid
+        :param mac: the mac address
+        :return: True if the mac address is valid, False otherwise
+        """
+        mac = self.sanitise(mac)
+        if not self.prefixes:
+            await self.load_vendors()
+        try:
+            return True if next(i for i in self.prefixes if mac.startswith(i["mac"]))["mac"] else False
+        except KeyError:
+            return False
+        except Exception as e:
+            logger.error(e)
             return False
 
+class MacLookup(BaseMacLookup):
+    def __init__(self):
+        self.async_lookup = AsyncMacLookup()
+        try:
+            self.loop = asyncio.get_event_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
 
-def get_start_hex(mac_addr: str) -> typing.Optional[str]:
-    """get the start hex of the mac address
-    :param mac_addr: the mac address
-    :return: the start hex of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        return response.json().get('result').get('start_hex')
+    def update_vendors(self, url=OUI_URL):
+        return self.loop.run_until_complete(self.async_lookup.update_vendors(url))
 
+    def lookup(self, mac):
+        return self.loop.run_until_complete(self.async_lookup.lookup(mac))
 
-def get_end_hex(mac_addr: str) -> typing.Optional[str]:
-    """get the end hex of the mac address
-    :param mac_addr: the mac address
-    :return: the end hex of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        return response.json().get('result').get('end_hex')
+    def look_up_nationality(self, mac):
+        return self.loop.run_until_complete(self.async_lookup.look_up_nationality(mac))
 
+    def load_vendors(self):
+        return self.loop.run_until_complete(self.async_lookup.load_vendors())
+    def is_mac_addr_valid(self, mac):
+        return self.loop.run_until_complete(self.async_lookup.is_mac_addr_valid(mac))
 
-def get_country(mac_addr: str) -> typing.Optional[str]:
-    """get the country of the mac address
-    :param mac_addr: the mac address
-    :return: the country of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        return response.json().get('result').get('country')
+def main():
+    import sys
 
+    loop = asyncio.get_event_loop()
+    if len(sys.argv) < 2:
+        print("Usage: {} [MAC-Address]".format(sys.argv[0]))
+        sys.exit()
+    try:
+        print(loop.run_until_complete(AsyncMacLookup().lookup(sys.argv[1])))
+    except KeyError:
+        print("Prefix is not registered")
+    except InvalidMacError as e:
+        print("Invalid MAC address:", e)
 
-def get_type(mac_addr: str) -> typing.Optional[str]:
-    """get the type of the mac address
-    :param mac_addr: the mac address
-    :return: the type of the mac address
-    """
-    response = requests.get(VALIDATOR_URL + mac_addr,
-                            headers=HEADERS_VALIDATOR_MAC)
-    if response.status_code == 200:
-        return response.json().get('result').get('type')
 
 
 if __name__ == "__main__":
-    # [print(x) for x in generate_mac_address(quantity=10)]
-    # print(validate_mac_addr(list(generate_mac_address(quantity=1))[0]))
-    # print(validate_mac_addr('01:00:00:00:00:20'))
-    print(is_mac_addr_valid('00:00:00:00:00:00'))
-    # print(get_vendors())
-    # print(get_random_json_from_array())
+    enable_debug_logging()
+    import sys
+
+    loop = asyncio.get_event_loop()
+    print(MacLookup().is_mac_addr_valid('20:00:00:00:00:00'))
+    #200000000000
+    #
+    # print(MacLookup().look_up_nationality("00:80:41:12:FE"))
+    # print(loop.run_until_complete(AsyncMacLookup().lookup("00:00:00:00:00:00")))
+
