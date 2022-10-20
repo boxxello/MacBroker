@@ -6,13 +6,12 @@ import random
 import typing
 from datetime import datetime
 from enum import Enum
-from typing import List, Tuple
-
+from typing import List, Tuple, Any
+import sys
 import aiofiles
 import aiohttp
 
 from mac_generator_validator.loggers import get_logger, enable_debug_logging
-import requests
 
 from mac_generator_validator.Exceptions import FormatErrorUnknown, InvalidMacError, VendorNotFoundError
 
@@ -38,67 +37,6 @@ class Format(Enum):
 
 
 HEXADECIMAL = "0123456789ABCDEF"
-VALIDATOR_URL = "http://macvendors.co/api/"
-HEADERS_VALIDATOR_MAC = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36',
-                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                         'accept-encoding': 'gzip, deflate',
-                         'accept-language': 'en-US,en;q=0.8',
-                         'referer': f'https://google.com/'}
-
-
-def generate_mac_address(trimmed=False,
-                         format_type: Format = None, lowercase=False,
-                         generate_partial=False, quantity=1) -> List[str]:
-    if not format_type:
-        logger.error("No MAC address type or format type specified, defaulting to colon format")
-        format_type = Format.COLON
-    try:
-        lowercase = bool(lowercase)
-    except ValueError:
-        logger.error("lowercase must be a boolean, defaulting to false")
-        lowercase = False
-    if quantity:
-        try:
-            quantity = int(quantity)
-        except ValueError:
-            logger.error("quantity must be an integer, defaulting to 1")
-            quantity = 1
-    for _ in range(quantity):
-        yield generate_address(format_type, lowercase, trimmed, generate_partial)
-    logger.info("DONE")
-
-
-def generate_address(format_type: Format,
-                     lowercase: bool, trimmed_flag,
-                     generate_partial) -> str:
-    """
-    Generate a random MAC address
-    :param format_type:
-    :param lowercase:
-    :param trimmed_flag:
-    :param generate_partial:
-    :return:
-    """
-    if generate_partial:
-        not_formatted = build_random_nic()
-    else:
-        not_formatted = build_random_twelve_digit()
-    mac = build_mac_with_separator(
-        set_lettercase(not_formatted, lowercase=lowercase), format_type
-    )
-    if trimmed_flag:
-        mac = trim_separator(mac)
-    if len(mac) < 12 and not generate_partial:
-        raise ValueError(f"MAC must be 12 digits but found {len(mac)}")
-    return mac
-
-
-def trim_separator(mac: str) -> str:
-    """removes separator from MAC address
-    :param mac: the mac address
-    :return: the mac address without separator
-    """
-    return mac.translate(str.maketrans("", "", ":-."))
 
 
 def set_lettercase(string: str, lowercase: bool) -> str:
@@ -117,6 +55,30 @@ def ins_value(source: str, insert: str, position: int) -> str:
     :return: the source string with the value inserted
     """
     return source[:position] + insert + source[position:]
+
+
+
+
+
+def get_mac_format(mac: str) -> Format:
+    """set the mac format style
+    :param mac: the mac address
+    :return: the format of the mac address
+    """
+    if mac.count("-") == 5 and "." not in mac and ":" not in mac:
+        return Format.HYPHEN
+    if mac.count(":") == 5 and "." not in mac and "-" not in mac:
+        return Format.COLON
+    if mac.count(".") == 5 and ":" not in mac and "-" not in mac:
+        return Format.PERIOD
+    if mac.count(".") == 2 and ":" not in mac and "-" not in mac:
+        return Format.CISCO
+    if len(mac) == 12:
+        return Format.NONE
+    if "." not in mac and ":" not in mac and "-" not in mac:
+        return Format.UNKNOWN
+    else:
+        return Format.NONE
 
 
 def build_mac_with_separator(mac: str, _format: Format) -> str:
@@ -163,67 +125,6 @@ def build_mac_with_separator(mac: str, _format: Format) -> str:
     if _format == Format.UNKNOWN:
         raise FormatErrorUnknown("Unknown MAC format")
 
-
-def get_mac_format(mac: str) -> Format:
-    """set the mac format style
-    :param mac: the mac address
-    :return: the format of the mac address
-    """
-    if mac.count("-") == 5 and "." not in mac and ":" not in mac:
-        return Format.HYPHEN
-    if mac.count(":") == 5 and "." not in mac and "-" not in mac:
-        return Format.COLON
-    if mac.count(".") == 5 and ":" not in mac and "-" not in mac:
-        return Format.PERIOD
-    if mac.count(".") == 2 and ":" not in mac and "-" not in mac:
-        return Format.CISCO
-    if len(mac) == 12:
-        return Format.NONE
-    if "." not in mac and ":" not in mac and "-" not in mac:
-        return Format.UNKNOWN
-    else:
-        return Format.NONE
-
-
-def build_random_nic() -> str:
-    """randomize 6-digit NIC portion of a mac addr
-    :return: the mac address with the random NIC portion
-    """
-    random_nic = get_random_json_from_array().get('mac')
-    # for c in range(0, 6):
-    #     random_nic += random.choice(HEXADECIMAL)
-    random_nic = trim_separator(random_nic)
-
-    return random_nic
-
-
-def build_random_twelve_digit() -> str:
-    """randomize 12-digit mac
-    :return: the mac address with the random 12-digit mac
-    """
-    mac = build_random_nic()
-    for number in range(0, 6):
-        mac += random.choice(HEXADECIMAL)
-    return mac
-
-
-def get_random_json_from_array() -> json:
-    """get the random vendor from the list of vendors
-    :param mac: the mac address
-    :return: the random vendor
-    """
-    vendors = get_vendors()
-    return random.choice(vendors)
-
-
-def get_vendors() -> json:
-    """get the list of vendors
-            :return: the list of vendorsis_mac_addr_valid
-    """
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    return json.load(open(os.path.join(root_dir, "vendors_mac.json"), "r"))
-
-
 def get_format(mac_type) -> Format:
     """get format of MAC address
     :param mac_type: the type of mac address
@@ -243,25 +144,22 @@ def get_format(mac_type) -> Format:
         raise FormatErrorUnknown("Unknown MAC format")
 
 
+def sanitise(_mac):
+    mac = _mac.translate(str.maketrans("", "", ":-.")).upper()
+    try:
+        int(mac, 16)
+    except ValueError:
+        raise InvalidMacError(f"{_mac} contains unexpected character")
+    if len(mac) > 12:
+        raise InvalidMacError(f"{_mac} is not a valid MAC address (too long)")
+    return mac
+
+
 OUI_URL = "http://standards-oui.ieee.org/oui.txt"
-
-
 
 
 class BaseMacLookup(object):
     cache_path = os.path.expanduser('~/.cache/mac-vendors.json')
-
-    @staticmethod
-    def sanitise(_mac):
-        mac = _mac.replace(":", "").replace("-", "").replace(".", "").upper()
-        try:
-            int(mac, 16)
-        except ValueError:
-            raise InvalidMacError(f"{_mac} contains unexpected character")
-        if len(mac) > 12:
-            raise InvalidMacError(f"{_mac} is not a valid MAC address (too long)")
-        return mac
-
     def get_last_updated(self):
         vendors_location = self.find_vendors_list()
         if vendors_location:
@@ -285,7 +183,7 @@ class AsyncMacLookup(BaseMacLookup):
         self.prefixes = None
 
     async def update_vendors(self, url=OUI_URL):
-        logger.debug( "Downloading MAC vendor list")
+        logger.debug("Downloading MAC vendor list")
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 self.prefixes = []
@@ -297,14 +195,82 @@ class AsyncMacLookup(BaseMacLookup):
                     if b"(base 16)" in line:
                         prefix, vendor = (i.strip() for i in line.split(b"(base 16)", 1))
                         self.prefixes.append({"vendor": vendor.decode(), "mac": prefix.decode()})
-                    elif group:=re.search(b"[A-Z]{2}", line):
+                    elif group := re.search(b"[A-Z]{2}", line):
                         if self.prefixes:
                             self.prefixes[-1]["nationality"] = group.group(0).decode().strip()
 
         async with aiofiles.open(AsyncMacLookup.cache_path, mode='w') as f:
             await f.write(json.dumps(self.prefixes, indent=4))
 
+    async def generate_n_mac_address(self,
+                             format_type: Format = None, lowercase=False,
+                             generate_partial=False, quantity=1) :
+        if not format_type:
+            logger.error("No MAC address type or format type specified, defaulting to colon format")
+            format_type = Format.COLON
+        try:
+            lowercase = bool(lowercase)
+        except ValueError:
+            logger.error("lowercase must be a boolean, defaulting to false")
+            lowercase = False
+        if quantity:
+            try:
+                quantity = int(quantity)
+            except ValueError:
+                logger.error("quantity must be an integer, defaulting to 1")
+                quantity = 1
+        for _ in range(quantity):
+            yield await self.generate_mac_address(format_type, lowercase,  generate_partial)
+        logger.info("DONE")
 
+    async def generate_mac_address(self, format_type: Format,
+                         lowercase: bool,
+                         generate_partial) -> str:
+        """
+        Generate a random MAC address
+        :param format_type:
+        :param lowercase:
+        :param trimmed_flag:
+        :param generate_partial:
+        :return:
+        """
+        if generate_partial:
+            not_formatted = await self.build_random_nic()
+        else:
+            not_formatted = await self.build_random_twelve_digit()
+        mac = build_mac_with_separator(
+            set_lettercase(not_formatted, lowercase=lowercase), format_type
+        )
+        if len(mac) < 12 and not generate_partial:
+            raise ValueError(f"MAC must be 12 digits but found {len(mac)}")
+        return mac
+    async def build_random_nic(self) -> str:
+        if not self.prefixes:
+            await self.load_vendors()
+        random_nic = (await self.get_random_vendor()).get("mac")
+        random_nic = sanitise(random_nic)
+
+        return random_nic
+
+    async def build_random_twelve_digit(self) -> str:
+        """randomize 12-digit mac
+        :return: the mac address with the random 12-digit mac
+        """
+        mac = await self.build_random_nic()
+        for number in range(0, 6):
+            mac += random.choice(HEXADECIMAL)
+        return mac
+
+
+    async def get_vendors(self) -> json:
+        if not self.prefixes:
+            await self.load_vendors()
+        return self.prefixes
+
+    async def get_random_vendor(self) -> dict:
+        if not self.prefixes:
+            await self.load_vendors()
+        return random.choice(self.prefixes)
 
     async def load_vendors(self):
         self.prefixes = []
@@ -321,19 +287,21 @@ class AsyncMacLookup(BaseMacLookup):
             except OSError:
                 pass
             await self.update_vendors()
-        logger.debug( "Vendor list successfully loaded: {} entries".format(len(self.prefixes)))
+        logger.debug("Vendor list successfully loaded: {} entries".format(len(self.prefixes)))
 
     async def lookup(self, mac):
-        mac = self.sanitise(mac)
+        mac = sanitise(mac)
         if not self.prefixes:
             await self.load_vendors()
         try:
             return next(i for i in self.prefixes if mac.startswith(i["mac"]))["vendor"]
         except KeyError:
             raise VendorNotFoundError(mac)
+        except StopIteration:
+            raise VendorNotFoundError(mac)
 
     async def look_up_nationality(self, mac):
-        mac = self.sanitise(mac)
+        mac = sanitise(mac)
         if not self.prefixes:
             await self.load_vendors()
         try:
@@ -342,21 +310,30 @@ class AsyncMacLookup(BaseMacLookup):
             raise VendorNotFoundError(mac)
         except StopIteration:
             raise VendorNotFoundError(mac)
+
     async def is_mac_addr_valid(self, mac):
         """
         Check if the mac address is valid
         :param mac: the mac address
         :return: True if the mac address is valid, False otherwise
         """
-        mac = self.sanitise(mac)
+        mac = sanitise(mac)
         if not self.prefixes:
             await self.load_vendors()
         try:
-            return True if any(mac.startswith(i["mac"]) for i in self.prefixes ) else False
+            return True if any(mac.startswith(i["mac"]) for i in self.prefixes) else False
         except KeyError:
             raise VendorNotFoundError(mac)
         except StopIteration:
             raise VendorNotFoundError(mac)
+
+    async def is_mac_addr_list_valid(self, macs: list) -> List[Tuple[bool, Any]]:
+        """
+        Check if the mac address is valid
+        :param mac: the mac address
+        :return: Tuple mac address and bool valid or invalid
+        """
+        return [(True, mac) if self.is_mac_addr_valid(mac) else (False, mac) for mac in macs]
 
 
 class MacLookup(BaseMacLookup):
@@ -379,17 +356,36 @@ class MacLookup(BaseMacLookup):
 
     def load_vendors(self):
         return self.loop.run_until_complete(self.async_lookup.load_vendors())
+
     def is_mac_addr_valid(self, mac):
         return self.loop.run_until_complete(self.async_lookup.is_mac_addr_valid(mac))
 
+    def is_mac_addr_list_valid(self, macs: list) -> List[Tuple[bool, Any]]:
+        return self.loop.run_until_complete(self.async_lookup.is_mac_addr_list_valid(macs))
+
+    def build_random_nic(self) -> str:
+        return self.loop.run_until_complete(self.async_lookup.build_random_nic())
+
+    def build_random_twelve_digit(self) -> str:
+        return self.loop.run_until_complete(self.async_lookup.build_random_twelve_digit())
+
+    def get_vendors(self) -> json:
+        return self.loop.run_until_complete(self.async_lookup.get_vendors())
+
+    def get_random_vendor(self) -> dict:
+        return self.loop.run_until_complete(self.async_lookup.get_random_vendor())
+
+    def generate_n_mac_addresses(self,  format_type:Format= Format.COLON,
+                                 lowercase: bool = False, generate_partial: bool = False, quantity:int=1) -> List[str]:
+        return self.loop.run_until_complete(list(self.async_lookup.generate_n_mac_address( format_type,
+                                                                                     lowercase, generate_partial, quantity)))
+
+
+
 if __name__ == "__main__":
     enable_debug_logging()
-    import sys
-
     loop = asyncio.get_event_loop()
-    print(MacLookup().is_mac_addr_valid("00:80:41:12:FE:00")) #-> this doesn't
-    print(MacLookup().is_mac_addr_valid("20:00:00:00:00:00")) #-> this gives trouble
-    print(MacLookup().look_up_nationality("00:80:41:12:FE:00")) #-> this doesn't
-    print(MacLookup().look_up_nationality("20:00:00:00:00:00")) #-> this gives trouble
-    # print(loop.run_until_complete(AsyncMacLookup().lookup("00:00:00:00:00:00")))
-
+    print(MacLookup().lookup("00:00:00:00:00:00"))
+    print(MacLookup().build_random_nic())
+    print(MacLookup().build_random_twelve_digit())
+    print(MacLookup().generate_n_mac_addresses())
