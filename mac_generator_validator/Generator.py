@@ -337,8 +337,10 @@ class AsyncMacLookup(BaseMacLookup):
         if not self.prefixes:
             await self.load_vendors()
         try:
-            return next(i for i in self.prefixes if mac.startswith(i["mac"]))["nationality"]
+            return any(mac.startswith(i["mac"]) for i in self.prefixes)
         except KeyError:
+            raise VendorNotFoundError(mac)
+        except StopIteration:
             raise VendorNotFoundError(mac)
     async def is_mac_addr_valid(self, mac):
         """
@@ -350,10 +352,11 @@ class AsyncMacLookup(BaseMacLookup):
         if not self.prefixes:
             await self.load_vendors()
         try:
-            return True if next(i for i in self.prefixes if mac.startswith(i["mac"])) else False
+            return True if any(mac.startswith(i["mac"]) for i in self.prefixes ) else False
         except KeyError:
             raise VendorNotFoundError(mac)
-
+        except StopIteration:
+            raise VendorNotFoundError(mac)
 
 
 class MacLookup(BaseMacLookup):
